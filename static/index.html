@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>India Import Shock</title>
+<style>
+:root{
+    --bg:#fff;
+    --pn:#f5f6f8;
+    --tx:#16181d;
+    --mu:#6b7280;
+    --ac:#e5484d;
+    color-scheme:light}
+*{
+    box-sizing:border-box
+}
+body{margin:0;
+    background:var(--bg);
+    color:var(--tx);
+    font:15px/1.5 system-ui,sans-serif
+}
+#app{
+    display:grid;
+    grid-template-columns:1fr 400px;
+    gap:16px;
+    padding:16px;
+    min-height:100vh
+}
+#gw{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-height:340px
+}
+#gl{
+    width:100%;
+    max-width:640px;
+    aspect-ratio:1
+}
+canvas{
+    width:100%;
+    height:100%;
+    cursor:grab;
+    touch-action:none
+}
+#p{
+    background:var(--pn);
+    border-radius:14px;
+    padding:18px;
+    overflow-y:auto
+}
+h1{
+    font-size:19px;
+    margin:0 0 12px
+}
+label{
+    display:block;
+    margin:10px 0 4px
+}
+select,input{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid #d5d8de;
+    border-radius:10px;
+    font:inherit;
+    background:#fff;
+    color:var(--tx)
+}
+input[type=range]{padding:0}
+.s{
+    color:var(--mu);
+    font-size:13px
+}
+#sum{
+    margin:12px 0;
+    padding:10px 12px;
+    background:#fff;
+    border-radius:10px
+}
+.r{
+    display:flex;
+    align-items:center;
+    gap:8px;margin:6px 0;
+    font-size:13.5px
+}
+.r span:first-child{width:48%}
+.b{
+    height:8px;
+    border-radius:4px;
+    background:var(--ac)
+}
+.v{
+    width:44px;
+    text-align:right
+}
+.w{
+    font-size:12.5px;
+    color:var(--mu);
+    margin:-2px 0 8px
+}
+@media(max-width:800px){#app{grid-template-columns:1fr}}
+#loading{
+    text-align: center;
+    padding:20px;
+    font-size: 16px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+    
+    
+<div id="p">
+    <h1>What happens if India’s imports stop?</h1>
+<label class="s">Who stops exporting to India?</label>
+<select id="c"></select>
+<label class="s">Which goods?</label>
+<select id="h"></select>
+<label class="s">How much stops: <b id="sv">100</b>%</label>
+<input id="sl" type="range" min="10" max="100" value="100" step="10">
+<h3 style="font-size:14px;margin:14px 0 6px">What it means</h3>
+<div id="sum">Loading…</div>
+<div id="o"></div>
+<div id="loading" style="display: none;">
+    <h3>Analysing Scenario....</h3>
+    <p>Please wait...</p>
+
+</div>
+<script>
+
+const $ = i =>
+document.getElementById(i);
+const pct = x => (100 *x ).toFixed( x < .1 ? 1:0) + "%";
+const api = async u => {
+    const r = await fetch(u);
+    if(!r.ok){
+        throw new Error(await r.text());
+    }
+    return r.json();
+}
+
+function render(r){
+    $("sum").innerHTML = r.ranking.length 
+        ? `Biggest hit: <b> ${r.ranking[0].industry} </b> 
+        (about ${pct(r.ranking[0].loss)} of normal output at risk). ` 
+        + r.direct.slice(0,3).map( d => 
+        `${d.name.toLowerCase().slice(0,40)}: 
+            ${pct(d.lost)} lost, 
+            ${pct(d.uncovered)} uncovered`).join("; ")+".":"India imports almost nothing of this from them now,impact is negligible.";
+    const mx = r.ranking.length ? r.ranking[0].loss : 1;
+    $("o").innerHTML = r.ranking.map(x => `<div class="r"><span>${x.industry.slice(0,44)}</span>
+        <div class="b" style="width:${Math.max(3,x.loss/mx*38)}%"></div>
+        <span class="v">${pct(x.loss)}</span>
+        </div>` 
+        + (x.why.length?`<div class="w"> ${x.why.join(" → ")} </div>` : "")).join("");
+    }
+async function run(){ 
+   
+    $("sum").textContent="Analysing...";
+    $("o").innerHTML="<p>Wait few seconds...</p>";
+   
+    
+    try{
+        const r=await api(`/api/scenario?country=${$("c").value}&hs=${$("h").value}&sev=${$("sl").value/100}`);
+        render(r);
+    }
+    catch(e){
+        $("sum").textContent="Server error: "+e.message
+    }
+    
+}
+let tm;
+["c","h","sl"].forEach(i => {
+    $(i).addEventListener("change", () => {
+        clearTimeout(tm);
+        tm=setTimeout(run,150)
+    });
+});
+(async () => {
+    try{
+        const o=await api("/api/options");
+    $("c").innerHTML = '<option value="__GULF__">Strait of Hormuz closed (all Gulf suppliers)</option>' + o.countries.map(c=>`<option value="${encodeURIComponent(c)}">${c}</option>`).join("");
+    $("h").innerHTML  = '<option value="all">All tracked goods</option>'+o.goods.map(g=>`<option value="${g.hs}">${g.name.slice(0,60)}</option>`).join("");
+    run();
+    }catch(e){
+        $("sum").textContent="Could not reach the server: "+e.message
+        }
+    })();
+
+</script>
+</body>
+</html>
